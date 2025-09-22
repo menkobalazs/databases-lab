@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ title }}</title>
+</head>
+<body>
+    <h1>{{ title }}</h1>
+    <form method="POST">
+        <label for="location">Search:</label><br>
+        <input type="text" id="location" name="location" style="width:300px;"><br><br>
+        <input type="submit" value="Submit">
+    </form>
+
+    {% if table %}
+        <h2>Results:</h2>
+        {{ table|safe }}
+        <p>The query run for this search was:</p>
+        <p>{{ query }}</p>
+    {% elif error %}
+        <p>{{ error }}</p>
+    {% endif %}
+</body>
+</html>

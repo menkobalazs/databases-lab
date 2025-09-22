@@ -1,0 +1,147 @@
+---
+title: "Homework 3."
+author: "Balázs Menkó"
+date: "16/10/2024"
+output: html_document
+---
+
+Please do the following tasks in an R Markdown document. Embed code in chunks as needed and write some short pieces of text to explain what you are doing so that others will be able to follow your work easily. Try to use some R Markdown formatting, e.g. header, text in bold or italics if possible. When you are ready, knit the document to generate the output html document. Please submit both the Rmd and html files when you submit your work.
+
+(You can find more information about the data in the Notes_Exercise2.html file.)
+
+### Libraries
+```{r}
+library(DBI)
+library(glue)
+library(ggplot2)
+library(leaflet)
+```
+
+---
+
+# Task 1
+Open a new R Markdown document. Give a title, give the author’s name (You). Set the output format to html_document. Save it.
+Connect to the covid19_cases.db SQLite database.
+List the tables in the database.
+List the field names of the table you have found.
+Retrieve the first 10 rows with an SQL query.
+(2 points)
+  
+```{r}
+# connect to our SQLite database in the file covid19_cases.db
+db=dbConnect(RSQLite::SQLite(), dbname="covid19_cases.db")
+
+# list tables
+dbListTables(db)
+
+# list field names of a table
+dbListFields(db, 'cases')
+
+# list the first 10 rows
+dbGetQuery(db, 
+      'SELECT * 
+      FROM cases LIMIT 10
+      ') # the first 10 rows
+```
+
+---
+
+# Task 2
+Choose a country. Plot a graph showing the weekly number of cases (weekly_count) over time in the selected country. (2 points)
+(Use column time, don’t forget to convert its values from character to date with the as.Date() function.)
+```{r}
+# Fetch the distinct countries
+countries <- dbGetQuery(db, 
+      'SELECT DISTINCT country 
+       FROM cases
+      ')
+countries
+
+# Pick a random county
+random_country <- sample(countries$country, 1)
+random_country
+```
+
+```{r}
+# Get the random county's data
+random_county_data <- dbGetQuery(db, 
+    glue('SELECT weekly_count, time
+         FROM cases
+         WHERE country="{random_country}"
+        '))
+# convert time from character to date (data are given in format: yyyy-mm-dd)
+random_county_data$time <- as.Date(random_county_data$time, format='%Y-%m-%d') 
+
+# create a graph: time - weeky_count 
+plot <- ggplot(data=random_county_data, aes(x=time,y=weekly_count))+
+            geom_point(size=1)+
+            labs(x='Date',y='Weekly number of cases')+
+            scale_x_date(date_breaks='2 months',date_labels='%e/%m\n%Y')+
+            geom_line(color='blue',size=0.3)+
+            ggtitle(glue("Weekly Number of Cases Over Time in {random_country}"))
+plot
+```
+
+---
+
+# Task 3
+Calculate the average weekly number of cases for the 4-week period [2022-01, 2022-04] in each country. (1 point)
+([2022-01, 2022-04] is a year_week range.)
+```{r}
+avg_weekly_count <- dbGetQuery(db, 
+      'SELECT country, AVG(weekly_count) AS avg_weekly_count
+       FROM cases
+       WHERE year_week BETWEEN "2022-01" AND "2022-04"
+       GROUP BY country
+       ORDER BY avg_weekly_count DESC
+      ')
+avg_weekly_count
+```
+
+---
+
+# Task 4
+Create a leaflet map, add markers for each country using the longitude and latitude coordinates. Add labels showing the average weekly number of cases (calculated in Task 3) for each country. (3 points)
+#### Create a map, add a marker for each location and the corresponding weekly average on a label
+```{r}
+# get the above query with coordinates
+leaflet_map <- dbGetQuery(db, 
+      'SELECT country, AVG(weekly_count) AS avg_weekly_count, longitude, latitude
+       FROM cases
+       WHERE year_week BETWEEN "2022-01" AND "2022-04"
+       GROUP BY country
+       ORDER BY avg_weekly_count DESC
+      ')
+leaflet_map
+```
+
+```{r}
+# add another column to 'leaflet_map' in which the labels are stored
+leaflet_map$label <- lapply(paste0("<strong>", leaflet_map$country, "</strong><br/>",
+                              "avg weekly cases: ", round(leaflet_map$avg_weekly_count)), 
+                            htmltools::HTML)
+```
+
+
+```{r}
+# create a map using the leaflet package with the desired height and width
+m <- leaflet(data=leaflet_map, width='800px', height='400px')
+
+# add tiles
+m <- addTiles(m)
+
+# set the center of the map view and the zoom level
+m <- setView(m, lng=mean(leaflet_map$longitude), lat=mean(leaflet_map$latitude), zoom=5)
+
+# add markers corresponding to the locations using the longitudes and latitudes given in df_map
+# also add labels from the label column of df_map - they will appear on mouse over
+m <- addMarkers(m, lng=~longitude, lat=~latitude, label=~label)
+m
+```
+
+---
+
+#### Close the connection
+```{r}
+dbDisconnect(db)
+```

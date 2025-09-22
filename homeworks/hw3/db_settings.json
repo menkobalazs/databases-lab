@@ -1,0 +1,9 @@
+{
+    "pguser": "menkobalazs1",
+    "pgpasswd": "O67UT7",
+    "pghost": "postgres-datasci.db-test",
+    "pgport": 5432,
+    "pgdb": "menkobalazs1_homework",
+    "schema": "public"
+
+}
